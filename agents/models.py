@@ -6,7 +6,14 @@ Standard: CAP / CLSI / ISO Standards
 import datetime
 from enum import Enum
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+# Safety bounds for input metrics
+PRIMARY_METRIC_MIN = 0.0
+PRIMARY_METRIC_MAX = 1000.0
+SECONDARY_METRIC_MIN = 0.0
+SECONDARY_METRIC_MAX = 1000.0
 
 
 class UrgencyLevel(str, Enum):
@@ -30,6 +37,27 @@ class SystemTaskPayload(BaseModel):
     is_critical_flag: bool = Field(default=False, description="Emergency escalation or high priority trigger")
     attributes: Dict[str, Any] = Field(default_factory=dict, description="Metadata key-value pairs")
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+
+    @field_validator("primary_metric")
+    @classmethod
+    def validate_primary_metric(cls, v):
+        if not (PRIMARY_METRIC_MIN <= v <= PRIMARY_METRIC_MAX):
+            raise ValueError(f"primary_metric must be between {PRIMARY_METRIC_MIN} and {PRIMARY_METRIC_MAX}")
+        return v
+
+    @field_validator("secondary_metric")
+    @classmethod
+    def validate_secondary_metric(cls, v):
+        if not (SECONDARY_METRIC_MIN <= v <= SECONDARY_METRIC_MAX):
+            raise ValueError(f"secondary_metric must be between {SECONDARY_METRIC_MIN} and {SECONDARY_METRIC_MAX}")
+        return v
+
+    @field_validator("task_id", "target_identifier", "status_descriptor")
+    @classmethod
+    def validate_no_control_chars(cls, v):
+        if any(ord(c) < 32 and c not in "\t\n\r" for c in v):
+            raise ValueError("Field must not contain control characters")
+        return v
 
 
 class AgentAlert(BaseModel):

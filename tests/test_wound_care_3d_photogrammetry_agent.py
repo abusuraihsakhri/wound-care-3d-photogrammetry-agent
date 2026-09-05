@@ -63,3 +63,29 @@ def test_supervisor_consensus_and_audit():
     assert main(["audit", "--task-id", "CLI-TEST-01"]) == 0
     assert main(["chat", "Explain", "specifications"]) == 0
     assert main(["verify-audit"]) == 0
+
+
+def test_input_validation_bounds():
+    """Test that out-of-range metrics are rejected."""
+    from pydantic import ValidationError
+
+    # Primary metric too high
+    with pytest.raises(ValidationError):
+        SystemTaskPayload(task_id="T1", target_identifier="KEY-01", primary_metric=5000.0)
+
+    # Primary metric negative
+    with pytest.raises(ValidationError):
+        SystemTaskPayload(task_id="T2", target_identifier="KEY-02", primary_metric=-5.0)
+
+    # Secondary metric too high
+    with pytest.raises(ValidationError):
+        SystemTaskPayload(task_id="T3", target_identifier="KEY-03", primary_metric=10.0, secondary_metric=5000.0)
+
+
+def test_phi_redaction():
+    """Test PHI redaction utility."""
+    text_with_phi = "Contact patient at john@example.com or 555-123-4567"
+    redacted = PHIGuard.redact_phi(text_with_phi)
+    assert "[REDACTED_IDENTIFIER]" in redacted
+    assert "john@example.com" not in redacted
+    assert "555-123-4567" not in redacted

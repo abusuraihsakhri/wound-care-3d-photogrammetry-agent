@@ -42,3 +42,28 @@ def test_coordinator():
 def test_cli():
     assert main(["audit", "--task-id", "CLI-01"]) == 0
     assert main(["chat", "What", "is", "the", "system", "status?"]) == 0
+
+
+def test_frontier_payload_validation():
+    """Test that FrontierPayload validates input bounds."""
+    # Valid payload should work
+    p = FrontierPayload("T1", "KEY-01", primary_metric=50.0, secondary_metric=5.0, status_descriptor="NOMINAL")
+    assert p.task_id == "T1"
+
+    # Out-of-range primary metric
+    with pytest.raises(ValueError):
+        FrontierPayload("T2", "KEY-02", primary_metric=5000.0, secondary_metric=5.0, status_descriptor="NOMINAL")
+
+    # Negative metric
+    with pytest.raises(ValueError):
+        FrontierPayload("T3", "KEY-03", primary_metric=-1.0, secondary_metric=5.0, status_descriptor="NOMINAL")
+
+    # Empty task_id
+    with pytest.raises(ValueError):
+        FrontierPayload("", "KEY-04", primary_metric=10.0, secondary_metric=5.0, status_descriptor="NOMINAL")
+
+
+def test_batch_error_handling():
+    """Test that batch processing handles missing files gracefully."""
+    result = main(["batch", "-i", "nonexistent_file.csv"])
+    assert result == 1
