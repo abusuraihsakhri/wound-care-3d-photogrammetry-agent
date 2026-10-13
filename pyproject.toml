@@ -13,7 +13,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
-    "Topic :: Security/Cryptography",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.9"
@@ -27,5 +27,11 @@ dependencies = [
 wound-care-3d-photogrammetry-engine = "wound_vision_ai.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/abusuraihsakhri/wound-care-3d-photogrammetry-engine"
-Repository = "https://github.com/abusuraihsakhri/wound-care-3d-photogrammetry-engine.git"
+Homepage = "https://github.com/abusuraihsakhri/wound-care-3d-photogrammetry-agent"
+Repository = "https://github.com/abusuraihsakhri/wound-care-3d-photogrammetry-agent"
+
+[tool.setuptools]
+py-modules = ["cli", "enrichment", "simulator", "wound_vision_ai_app"]
+
+[tool.setuptools.packages.find]
+include = ["agents*", "wound_vision_ai*"]

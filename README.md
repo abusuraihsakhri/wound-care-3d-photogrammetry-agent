@@ -1,186 +1,73 @@
 # Wound Care 3D Photogrammetry Agent
 
-> **Domain:** Clinical Decision Support & Wound Care AI
-> **Standards:** CAP / CLSI / ISO / NPUAP / EPUAP Pressure Injury Standards
+A research-stage Python rule-evaluation prototype with a standalone browser demonstration. **Despite the repository name, the current implementation does not reconstruct 3D surfaces, process wound photographs, segment tissue, or calculate validated PUSH scores.** Its thresholds and descriptors are illustrative software rules, **not clinical decision criteria**.
 
-<div align="center">
+## Browser demonstration
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+Open `web/index.html` locally, or deploy the `web/` directory through GitHub Pages. The page evaluates three existing backend rules and exports a JSON result. It runs entirely in-browser without Python, external scripts, a backend connection, network uploads, cookies, or browser storage. The Pages workflow is supplied in `.github/workflows/pages.yml`; a public URL should only be published after Pages is enabled and the deployed page is verified.
 
-</div>
+Use **synthetic identifiers only**. Do not provide identifiable patient data or use outputs to direct patient care.
 
----
+## What is implemented
 
-## Overview
+- `agents/`: Pydantic-validated audit payloads and three deterministic workers: primary metric above **25**, secondary metric above **12** or critical flag, and anomaly-keyword detection.
+- `agents/base.py`: process-local HMAC-SHA256 hash-chain for audit events, including signature verification. Logs exist only in RAM and are lost on restart; this is **not** a durable or externally anchored audit record.
+- `agents/api.py`: FastAPI endpoints (`/health`, `/api/audit`, `/api/chat`, `/api/audit/logs`, `/metrics`) and the local browser demonstration at `/`. The `/metrics` endpoint returns JSON counters, not Prometheus exposition text.
+- `wound_vision_ai/`: a separate experimental rule engine (primary threshold **25**, secondary threshold **10**) and CLI. Despite legacy class names, it does not calculate a clinical PUSH score or 3D surface metrics.
+- `enrichment.py`: placeholder threshold-based modules; no validated prediction or live healthcare integration.
 
-Wound Care 3D Photogrammetry Agent is a multi-agent analytical platform for clinical wound assessment. It evaluates tissue measurements, detects anomalies, and generates structured dossiers with cryptographic audit trails. The system operates under strict zero-PHI outbound policies to prevent accidental exposure of patient identifiers.
+The `mock` model provider returns a deterministic message; it does not call an LLM. The references to clinical standards in legacy output are not evidence of compliance or clinical validation.
 
----
+## Install and run
 
-## Key Capabilities
-
-- **Multi-Agent Evaluation Pipeline**: Three specialized workers (InvariantQC, SafetyEscalation, ProtocolConformance) analyze each task
-- **Zero-PHI Outbound Interceptor**: AST and regex inspection blocking SSNs, MRNs, phone numbers, emails, and patient identifiers
-- **Tamper-Evident HMAC-SHA256 Audit Trail**: Chained, cryptographically signed logs for every evaluation
-- **Input Validation**: Bounds checking on all metrics with configurable safety limits
-- **FastAPI REST API**: OpenAPI 3.1 endpoints for integration with clinical systems
-- **Batch Processing**: CSV-based high-throughput evaluation with error recovery
-- **Prometheus Telemetry**: Operational metrics export (`/metrics`)
-
----
-
-## Installation
+Python 3.9+ (CI tests 3.10–3.12):
 
 ```bash
-# Clone the repository
 git clone https://github.com/abusuraihsakhri/wound-care-3d-photogrammetry-agent.git
 cd wound-care-3d-photogrammetry-agent
-
-# Install dependencies
-pip install -e .
-
-# Or install directly
-pip install pydantic fastapi uvicorn pytest
-```
-
-### Environment Configuration
-
-```bash
-# Copy the example environment file
-cp .env.example .env
-
-# Edit .env to set your production values
-# AUDIT_SECRET_KEY=your-strong-random-key-here
-```
-
----
-
-## Usage
-
-### CLI Commands
-
-```bash
-# Run single task evaluation
-python cli.py audit --task-id TASK-001 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
-
-# Interactive chat with supervisor
-python cli.py chat "What is the system status?"
-
-# Batch process CSV records
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+python cli.py audit --task-id DEMO-1 --target SAMPLE-1 --primary 29.4 --secondary 14.8 --status DISCORDANT
 python cli.py batch -i sample.csv -o results.csv
-
-# Verify audit trail integrity
-python cli.py verify-audit
-
-# Launch REST API server
 python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
-### REST API
+With the API running, browse to `http://127.0.0.1:8000/`. Submit synthetic JSON to `POST /api/audit`, or inspect `/docs` for the FastAPI-generated schema.
 
 ```bash
-# Health check
-curl http://localhost:8000/health
-
-# Submit evaluation task
-curl -X POST http://localhost:8000/api/audit \
-  -H "Content-Type: application/json" \
-  -d @sample_payload.json
-
-# Query audit trail
-curl http://localhost:8000/api/audit/logs
-
-# Prometheus metrics
-curl http://localhost:8000/metrics
+curl -X POST http://127.0.0.1:8000/api/audit \
+  -H 'Content-Type: application/json' \
+  --data-binary @sample_payload.json
 ```
 
-### Docker Deployment
+The separate domain rule CLI can be run with `python -m wound_vision_ai.cli audit`. Docker configuration is provided for running the API; set `AUDIT_SECRET_KEY` in a private `.env` file before a non-development deployment.
+
+## Test and build
 
 ```bash
-# Build and run with Docker Compose
-docker-compose up --build
-
-# Or manually
-docker build -t wound-care-3d-photogrammetry-agent .
-docker run -p 8000:8000 --env-file .env wound-care-3d-photogrammetry-agent
+python -m pip install -e . pytest httpx build
+python -m pytest -q
+python -m compileall -q agents wound_vision_ai cli.py enrichment.py simulator.py
+node --check web/app.js
+node --test tests/test_browser_demo.cjs
+python -m build
 ```
 
----
+The GitHub Actions CI workflow runs the Python test suite across Python 3.10, 3.11, and 3.12, including JavaScript rule tests and a package build.
 
-## Input Data Schema
+## Privacy and limitations
 
-| Field | Type | Description | Bounds |
-|:------|:-----|:------------|:-------|
-| `task_id` | string | Unique task identifier | Required, non-empty |
-| `target_identifier` | string | Entity or specimen key | Required, non-empty |
-| `primary_metric` float | Primary measurement | 0.0 - 1000.0 |
-| `secondary_metric` | float | Secondary measurement | 0.0 - 1000.0 |
-| `status_descriptor` | string | Status code (NOMINAL, DISCORDANT, etc.) | Required |
-| `is_critical_flag` | boolean | Emergency escalation trigger | Default: false |
+The backend includes **heuristic regular-expression screening** for common identifier patterns. This is neither complete PHI de-identification nor a HIPAA-compliance guarantee. The API has **no authentication** and should not be exposed on the public internet or used with real patient data. Browser validation restricts the shape of synthetic identifiers, but cannot establish whether a value is personally identifying.
 
----
+A missing `AUDIT_SECRET_KEY` now generates a temporary random key for development; a stable secret must be configured for process-consistent signatures. Audit records are in memory, without durable storage, external anchoring, or meaningful cross-restart integrity guarantees. The browser demonstration does **not** generate HMAC signatures.
 
-## Testing
+The project is experimental software and requires independent clinical validation, cybersecurity review, and architecture work before any use in clinical workflows.
 
-```bash
-# Run full test suite
-pytest -v
+## Technologies and compatibility
 
-# Run with coverage
-pytest -v --cov=agents --cov=wound_vision_ai
-
-# Run simulation benchmark
-python simulator.py 1000
-```
-
----
-
-## Security
-
-- **Zero-PHI Guard**: All outbound data is inspected for patient identifiers before logging or transmission
-- **Audit Trail**: HMAC-SHA256 chained signatures prevent tampering
-- **Input Validation**: All metrics are bounds-checked; control characters are rejected
-- **Secrets Management**: Production secrets via environment variables (never hardcoded)
-
----
-
-## Project Structure
-
-```
-wound-care-3d-photogrammetry-agent/
-├── agents/                  # Enterprise multi-agent framework
-│   ├── api.py              # FastAPI REST endpoints
-│   ├── base.py             # Security, PHI guard, audit trail
-│   ├── models.py           # Pydantic schemas with validation
-│   ├── supervisor.py       # Master orchestrator
-│   ├── workers.py          # Specialized evaluation workers
-│   ├── llm_factory.py      # LLM provider abstraction
-│   ├── learning.py         # Bayesian calibration engine
-│   ├── metrics.py          # Prometheus metrics collector
-│   └── streamer.py         # WebSocket telemetry broadcaster
-├── wound_vision_ai/         # Domain-specific wound care module
-│   ├── agents.py           # Tissue segmentation, PUSH scoring
-│   ├── engine.py           # Core algorithmic engine
-│   ├── models.py           # Frontier data models
-│   ├── cli.py              # Domain CLI
-│   └── server.py           # Domain FastAPI server
-├── tests/                   # Pytest test suite
-├── cli.py                   # Main CLI entry point
-├── simulator.py             # High-throughput simulation
-├── enrichment.py            # Feature enrichment suite
-├── pyproject.toml           # Project configuration
-├── Dockerfile               # Container build
-├── docker-compose.yml       # Container orchestration
-└── .env.example             # Environment template
-```
-
----
+Python, Pydantic, FastAPI, Uvicorn; standard HTML/CSS/JavaScript for the static interface. The browser demonstration requires a modern desktop/mobile browser with JavaScript and Blob download support. No Pyodide is necessary for the implemented rules.
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).
